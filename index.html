@@ -168,8 +168,10 @@ a { color: inherit; text-underline-offset: 3px; }
 .scelta input:focus-visible + .tondo { outline: 3px solid var(--inchiostro); outline-offset: 3px; }
 .scala .etichetta { font-size: .8rem; line-height: 1.2; text-align: center; color: var(--grigio); }
 .scala input:checked ~ .etichetta { color: var(--inchiostro); font-weight: 700; }
-.bianca { margin-top: 10px; background: none; border: 0; padding: 4px 0; font-size: .9rem; color: var(--grigio); text-decoration: underline; text-underline-offset: 3px; }
-.bianca:hover { color: var(--inchiostro); }
+.manca-nota { display: none; margin-top: 12px; font-size: .9rem; font-weight: 700; color: var(--rosso); }
+.affermazione { position: relative; }
+.affermazione.manca::before { content: ""; position: absolute; left: -14px; top: 28px; bottom: 0; width: 4px; border-radius: 2px; background: var(--rosso); }
+.affermazione.manca .manca-nota { display: block; }
 
 /* ---------- Risultato: l'aula ---------- */
 .aula-interno { max-width: 960px; margin: 0 auto; padding: 44px 24px 40px; }
@@ -419,7 +421,7 @@ button.riga-gruppo[aria-pressed="true"] { box-shadow: inset 3px 0 0 var(--c); }
         <summary>Come funziona il calcolo</summary>
         <ol>
           <li>Ogni risposta vale da −2 (per niente d’accordo) a +2 (del tutto d’accordo). A ciascuno degli otto gruppi del Parlamento europeo è stata assegnata una posizione sulla stessa scala, affermazione per affermazione: è quella del partito italiano che ne fa parte.</li>
-          <li>L’affinità con un gruppo è 100% meno la distanza media tra le tue risposte e le sue posizioni. I temi che hai scelto come prioritari pesano il doppio; le affermazioni lasciate in bianco non contano.</li>
+          <li>L’affinità con un gruppo è 100% meno la distanza media tra le tue risposte e le sue posizioni. I temi che hai scelto come prioritari pesano il doppio.</li>
           <li>L’affinità diventa una quota di «voti»: più sei vicino a un gruppo rispetto agli altri, più la sua quota cresce. I gruppi sotto il 3% restano fuori dall’aula.</li>
           <li>I 400 seggi sono ripartiti in proporzione con il metodo D’Hondt.</li>
           <li>Le coalizioni proposte raggiungono 201 seggi senza gruppi superflui e sono ordinate dalla più omogenea per posizioni sui temi.</li>
@@ -827,8 +829,7 @@ var PARAMETRI = {
   pesoPriorita: 2,       // quanto pesano i temi scelti come prioritari
   maxPriorita: 3,
   soglia: 0.03,          // sbarramento sul "voto" simulato
-  nitidezza: 9,          // quanto l'affinità si traduce in distanza di voti (più alto = emiciclo più polarizzato)
-  minimoRisposte: 10
+  nitidezza: 9           // quanto l'affinità si traduce in distanza di voti (più alto = emiciclo più polarizzato)
 };
 </script>
 
@@ -1013,13 +1014,23 @@ function aggiornaAvanzamento() {
   $('avanzamento-tacche').innerHTML = tacche;
 }
 
+function senzaRisposta() {
+  return [].filter.call($('tema-affermazioni').querySelectorAll('.affermazione'), function (f) { return stato.risposte[f.getAttribute('data-chiave')] === undefined; });
+}
+function avvisoMancanti(n) {
+  var a = $('tema-avviso');
+  a.hidden = n === 0;
+  if (n) a.textContent = (n === 1 ? 'Manca la risposta a un’affermazione: è segnata in rosso.' : 'Mancano le risposte a ' + n + ' affermazioni: sono segnate in rosso.') + ' Se non hai un’opinione, scegli Neutrale.';
+}
 function avanti() {
-  if (stato.passo === ULTIMO - 1) {
-    var n = Object.keys(risposteValide()).length;
-    if (n < PARAMETRI.minimoRisposte) {
-      var a = $('tema-avviso');
-      a.textContent = 'Hai segnato ' + n + (n === 1 ? ' affermazione' : ' affermazioni') + ': ne servono almeno ' + PARAMETRI.minimoRisposte + ' per comporre l’emiciclo. Torna indietro e completa qualche tema.';
-      a.hidden = false;
+  if (stato.passo >= 2 && stato.passo < ULTIMO) {      // ogni affermazione vuole una risposta: non si lascia in bianco
+    var vuote = senzaRisposta();
+    if (vuote.length) {
+      vuote.forEach(function (f) { f.classList.add('manca'); });
+      avvisoMancanti(vuote.length);
+      var calmo = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (vuote[0].scrollIntoView) vuote[0].scrollIntoView({ behavior: calmo ? 'auto' : 'smooth', block: 'center' });
+      vuote[0].querySelector('input').focus({ preventScroll: true });
       return;
     }
   }
@@ -1068,27 +1079,20 @@ function disegnaTema(i) {
       h += '<label class="scelta" data-v="' + s[0] + '"><input type="radio" name="' + nome + '" value="' + s[0] + '"' + (attuale === s[0] ? ' checked' : '') +
         ' aria-label="' + SCALA_ESTESA[s[0]] + '"><span class="tondo">' + SPUNTA + '</span><span class="etichetta" aria-hidden="true">' + s[1] + '</span></label>';
     });
-    h += '</div><button type="button" class="bianca"' + (attuale === undefined ? ' hidden' : '') + '>Lascia in bianco</button>';
+    h += '</div><p class="manca-nota">Manca la risposta</p>';
     var f = el('div', { 'class': 'affermazione', 'data-chiave': chiave }, '<fieldset>' + h + '</fieldset>');
     box.appendChild(f);
   });
   $('tema-guida').textContent = stato.soloNuove
     ? (visibili === 1 ? 'Un’altra affermazione' : 'Altre ' + visibili + ' affermazioni') + ' su questo tema. Le risposte che hai già dato restano valide.'
-    : 'Segna quanto sei d’accordo. Quello che lasci in bianco non entra nel calcolo.';
+    : 'Segna quanto sei d’accordo con ogni affermazione. Se non hai un’opinione, scegli Neutrale.';
   box.onchange = function (e) {
     var f = e.target.closest('.affermazione');
     stato.risposte[f.getAttribute('data-chiave')] = Number(e.target.value);
-    f.querySelector('.bianca').hidden = false;
-    $('tema-avviso').hidden = true;
+    f.classList.remove('manca');
+    if (!$('tema-avviso').hidden) avvisoMancanti(senzaRisposta().length);
   };
-  box.onclick = function (e) {
-    if (!e.target.classList.contains('bianca')) return;
-    var f = e.target.closest('.affermazione');
-    delete stato.risposte[f.getAttribute('data-chiave')];
-    [].forEach.call(f.querySelectorAll('input'), function (r) { r.checked = false; });
-    e.target.hidden = true;
-    f.querySelector('input').focus();
-  };
+  box.onclick = null;
 }
 
 /* ---------- Risultato ---------- */
@@ -1114,7 +1118,7 @@ function disegnaRisultato() {
 
   $('verdetto').textContent = testoVerdetto(r);
   $('verdetto-sotto').textContent = (osp ? 'Con le sue risposte' : 'Con le tue risposte') + ' la Camera si dividerebbe in ' + ord.length + (ord.length === 1 ? ' gruppo' : ' gruppi') +
-    (osp ? '. Ha segnato ' : '. Hai segnato ') + r.contate + ' affermazioni su ' + totaleAff + '; per governare servono ' + PARAMETRI.maggioranza + ' seggi.';
+    (osp ? '. Ha risposto a ' : '. Hai risposto a ') + r.contate + ' affermazioni' + (r.contate < totaleAff ? ' su ' + totaleAff : '') + '; per governare servono ' + PARAMETRI.maggioranza + ' seggi.';
 
   // chi apre un link vede il risultato di un altro: cambiano i testi e i bottoni
   $('ospite').hidden = !osp;
@@ -1182,7 +1186,7 @@ function disegnaRisultato() {
   // tema per tema
   $('temi').innerHTML = TEMI.map(function (t) {
     var v = r.perTema[t.id], prior = stato.priorita.has(t.id) ? '<small>priorità</small>' : '', dx;
-    if (!v) dx = 'Lasciato in bianco';
+    if (!v) dx = 'Lasciato in bianco';      // può capitare solo in un link creato prima che la risposta diventasse obbligatoria
     else {
       var max = Math.max.apply(null, v), primi = [];
       v.forEach(function (x, i) { if (max - x < 1e-9) primi.push(i); });
