@@ -202,6 +202,8 @@ button.riga-gruppo[aria-pressed="true"] { box-shadow: inset 3px 0 0 var(--c); }
 .gruppi .fuori .pallino { background: #fff; box-shadow: inset 0 0 0 2px var(--c); }
 .gruppi .fuori .nome, .gruppi .fuori .numero { color: var(--grigio); }
 .azioni { margin-top: 32px; display: flex; flex-wrap: wrap; gap: 12px 14px; align-items: center; }
+.scarica { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0 14px; }
+.scarica .testuale { font-size: .98rem; }
 .esito-azione { min-height: 1.5em; margin-top: 10px; font-size: .92rem; color: var(--grigio); }
 .ospite { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; margin-bottom: 32px; padding: 18px 22px; border-radius: 14px; background: var(--velo); }
 .ospite p { flex: 1 1 17em; max-width: 34em; font-size: .98rem; }
@@ -380,7 +382,10 @@ button.riga-gruppo[aria-pressed="true"] { box-shadow: inset 3px 0 0 var(--c); }
         <p class="didascalia" id="didascalia" aria-live="polite"></p>
         <ul class="gruppi" id="gruppi"></ul>
         <div class="azioni">
-          <button class="bottone" type="button" id="b-immagine">Scarica l’immagine</button>
+          <span class="scarica" id="scarica">
+            <button class="bottone" type="button" id="b-immagine">Scarica l’immagine</button>
+            <button class="bottone testuale" type="button" id="b-jpg" aria-label="Scarica l’immagine in formato JPG">o in JPG</button>
+          </span>
           <button class="bottone secondario" type="button" id="b-link">Copia il link</button>
           <button class="bottone secondario" type="button" id="b-copia">Copia il risultato</button>
           <button class="bottone secondario" type="button" id="b-completa" hidden></button>
@@ -1113,7 +1118,7 @@ function disegnaRisultato() {
 
   // chi apre un link vede il risultato di un altro: cambiano i testi e i bottoni
   $('ospite').hidden = !osp;
-  ['b-immagine', 'b-link', 'b-copia', 'b-rifai'].forEach(function (id) { $(id).hidden = osp; });
+  ['scarica', 'b-link', 'b-copia', 'b-rifai'].forEach(function (id) { $(id).hidden = osp; });
   $('b-fai').hidden = !osp;
   [].forEach.call($('s-risultato').querySelectorAll('[data-ospite]'), function (e) {
     if (!e.hasAttribute('data-proprio')) e.setAttribute('data-proprio', e.textContent);
@@ -1455,7 +1460,8 @@ function creaImmagine(r) {
   return c;
 }
 
-function scaricaImmagine() {
+function scaricaImmagine(formato) {
+  var jpg = formato === 'jpg', nome = 'il-mio-emiciclo.' + (jpg ? 'jpg' : 'png');
   var pronto = document.fonts && document.fonts.load
     ? Promise.all([document.fonts.load('700 60px "Bodoni Moda"'), document.fonts.load('600 29px "Titillium Web"'), document.fonts.load('400 24px "Titillium Web"')])
     : Promise.resolve();
@@ -1463,11 +1469,11 @@ function scaricaImmagine() {
     var c = creaImmagine(ultimoRisultato);
     c.toBlob(function (blob) {
       if (!blob) { esito('Immagine non creata: il browser non ha completato l’esportazione.'); return; }
-      var url = URL.createObjectURL(blob), a = el('a', { href: url, download: 'il-mio-emiciclo.png' });
+      var url = URL.createObjectURL(blob), a = el('a', { href: url, download: nome });
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
-      esito('Immagine scaricata: il-mio-emiciclo.png');
-    }, 'image/png');
+      esito('Immagine scaricata: ' + nome);
+    }, jpg ? 'image/jpeg' : 'image/png', jpg ? 0.92 : undefined);      // il fondo è bianco pieno, quindi il JPG non perde trasparenze
   });
 }
 
@@ -1484,7 +1490,8 @@ if (MENU_CONDIVISIONE) $('b-link').textContent = 'Condividi il link';
 $('n-rapido').textContent = contaAffermazioni('rapido');
 $('n-completo').textContent = contaAffermazioni('completo');
 $('b-completa').addEventListener('click', function () { stato.modo = 'completo'; stato.soloNuove = true; mostra(2); });
-$('b-immagine').addEventListener('click', scaricaImmagine);
+$('b-immagine').addEventListener('click', function () { scaricaImmagine('png'); });
+$('b-jpg').addEventListener('click', function () { scaricaImmagine('jpg'); });
 $('b-link').addEventListener('click', condividiLink);
 $('b-copia').addEventListener('click', copiaRisultato);
 $('b-rifai').addEventListener('click', function () { rifai(); });
