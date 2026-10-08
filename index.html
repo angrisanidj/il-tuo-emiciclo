@@ -203,6 +203,10 @@ button.riga-gruppo[aria-pressed="true"] { box-shadow: inset 3px 0 0 var(--c); }
 .gruppi .fuori .nome, .gruppi .fuori .numero { color: var(--grigio); }
 .azioni { margin-top: 32px; display: flex; flex-wrap: wrap; gap: 12px 14px; align-items: center; }
 .esito-azione { min-height: 1.5em; margin-top: 10px; font-size: .92rem; color: var(--grigio); }
+.ospite { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; margin-bottom: 32px; padding: 18px 22px; border-radius: 14px; background: var(--velo); }
+.ospite p { flex: 1 1 17em; max-width: 34em; font-size: .98rem; }
+.ospite .bottone { flex: none; }
+.apertura .avviso { margin: 0 0 18px; }
 
 /* ---------- Risultato: il dettaglio ---------- */
 .dettaglio { max-width: 960px; margin: 0 auto; padding: 0 24px 40px; }
@@ -316,6 +320,7 @@ button.riga-gruppo[aria-pressed="true"] { box-shadow: inset 3px 0 0 var(--c); }
   <!-- 0. Apertura -->
   <section class="apertura" id="s-apertura">
     <div>
+      <p class="avviso" id="link-rotto" role="status" hidden>Il link che hai aperto non è valido o è incompleto. Puoi comunque fare il test.</p>
       <h1>Se la Camera la pensasse come te, chi siederebbe nei suoi 400 seggi?</h1>
       <p class="sommario">Scegli i temi che ti stanno più a cuore, segna quanto sei d’accordo con una serie di affermazioni e guarda come si dividerebbe l’aula di Montecitorio tra le otto famiglie politiche europee, ciascuna con i partiti italiani che ne fanno parte.</p>
       <div class="scelte-test">
@@ -365,6 +370,10 @@ button.riga-gruppo[aria-pressed="true"] { box-shadow: inset 3px 0 0 var(--c); }
   <section id="s-risultato" hidden>
     <div class="aula">
       <div class="aula-interno">
+        <div class="ospite" id="ospite" hidden>
+          <p><strong>Questo è l’emiciclo di chi ti ha mandato il link.</strong> Vedi il suo risultato, non le sue risposte.</p>
+          <button class="bottone" type="button" data-fai>Fai il test anche tu</button>
+        </div>
         <h2 tabindex="-1" id="verdetto"></h2>
         <p class="sotto" id="verdetto-sotto"></p>
         <div class="grafico" id="grafico"></div>
@@ -372,9 +381,11 @@ button.riga-gruppo[aria-pressed="true"] { box-shadow: inset 3px 0 0 var(--c); }
         <ul class="gruppi" id="gruppi"></ul>
         <div class="azioni">
           <button class="bottone" type="button" id="b-immagine">Scarica l’immagine</button>
+          <button class="bottone secondario" type="button" id="b-link">Copia il link</button>
           <button class="bottone secondario" type="button" id="b-copia">Copia il risultato</button>
           <button class="bottone secondario" type="button" id="b-completa" hidden></button>
           <button class="bottone testuale" type="button" id="b-rifai">Rifai il test</button>
+          <button class="bottone" type="button" id="b-fai" data-fai hidden>Fai il test anche tu</button>
         </div>
         <p class="esito-azione" id="esito-azione" aria-live="polite"></p>
       </div>
@@ -388,14 +399,14 @@ button.riga-gruppo[aria-pressed="true"] { box-shadow: inset 3px 0 0 var(--c); }
       </div>
 
       <div class="blocco">
-        <h3>Quanto sei vicino a ogni gruppo</h3>
-        <p>L’affinità misura quanto le tue risposte coincidono con le posizioni dei partiti italiani di ciascun gruppo: 100% vuol dire identiche, 0% opposte. Per ogni gruppo è indicato quante posizioni hanno una fonte e quante sono stime.</p>
+        <h3 data-ospite="Quanto è vicino a ogni gruppo">Quanto sei vicino a ogni gruppo</h3>
+        <p data-ospite="L’affinità misura quanto le risposte di chi ha fatto il test coincidono con le posizioni dei partiti italiani di ciascun gruppo: 100% vuol dire identiche, 0% opposte. Per ogni gruppo è indicato quante posizioni hanno una fonte e quante sono stime.">L’affinità misura quanto le tue risposte coincidono con le posizioni dei partiti italiani di ciascun gruppo: 100% vuol dire identiche, 0% opposte. Per ogni gruppo è indicato quante posizioni hanno una fonte e quante sono stime.</p>
         <ul class="vicinanze" id="vicinanze"></ul>
       </div>
 
       <div class="blocco">
         <h3>Tema per tema</h3>
-        <p>Il gruppo più vicino a te su ogni argomento. Se più gruppi sono alla pari, li trovi tutti.</p>
+        <p data-ospite="Il gruppo più vicino a chi ha fatto il test su ogni argomento. Se più gruppi sono alla pari, li trovi tutti.">Il gruppo più vicino a te su ogni argomento. Se più gruppi sono alla pari, li trovi tutti.</p>
         <ul class="temi" id="temi"></ul>
       </div>
 
@@ -893,7 +904,7 @@ var SCALA = [[-2, 'Per niente'], [-1, 'Poco'], [0, 'Neutrale'], [1, 'Abbastanza'
 var SCALA_ESTESA = { '-2': 'Per niente d’accordo', '-1': 'Poco d’accordo', '0': 'Neutrale', '1': 'Abbastanza d’accordo', '2': 'Del tutto d’accordo' };
 var SPUNTA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.6l4.4 4.4L19 7.4"/></svg>';
 var ULTIMO = TEMI.length + 2;            // passi: 0 apertura, 1 priorità, 2..11 temi, 12 risultato
-var stato = { passo: 0, risposte: {}, priorita: new Set(), modo: 'rapido', soloNuove: false };
+var stato = { passo: 0, risposte: {}, priorita: new Set(), modo: 'rapido', soloNuove: false, ospite: null };   // ospite: risultato letto da un link
 var ultimoRisultato = null;
 
 function $(id) { return document.getElementById(id); }
@@ -1089,15 +1100,25 @@ function testoVerdetto(r) {
 }
 
 function disegnaRisultato() {
-  var r = calcola(risposteValide(), stato.priorita);
+  var o = stato.ospite, osp = !!o;
+  var r = osp ? { affinita: o.affinita, seggi: o.seggi, perTema: o.perTema, contate: o.contate } : calcola(risposteValide(), stato.priorita);
   if (!r) { mostra(1); return; }
   r.coalizioni = coalizioni(r.seggi, stato.priorita);
   ultimoRisultato = r;
   var ord = ordineSeggi(r), totaleAff = contaAffermazioni();
 
   $('verdetto').textContent = testoVerdetto(r);
-  $('verdetto-sotto').textContent = 'Con le tue risposte la Camera si dividerebbe in ' + ord.length + (ord.length === 1 ? ' gruppo' : ' gruppi') +
-    '. Hai segnato ' + r.contate + ' affermazioni su ' + totaleAff + '; per governare servono ' + PARAMETRI.maggioranza + ' seggi.';
+  $('verdetto-sotto').textContent = (osp ? 'Con le sue risposte' : 'Con le tue risposte') + ' la Camera si dividerebbe in ' + ord.length + (ord.length === 1 ? ' gruppo' : ' gruppi') +
+    (osp ? '. Ha segnato ' : '. Hai segnato ') + r.contate + ' affermazioni su ' + totaleAff + '; per governare servono ' + PARAMETRI.maggioranza + ' seggi.';
+
+  // chi apre un link vede il risultato di un altro: cambiano i testi e i bottoni
+  $('ospite').hidden = !osp;
+  ['b-immagine', 'b-link', 'b-copia', 'b-rifai'].forEach(function (id) { $(id).hidden = osp; });
+  $('b-fai').hidden = !osp;
+  [].forEach.call($('s-risultato').querySelectorAll('[data-ospite]'), function (e) {
+    if (!e.hasAttribute('data-proprio')) e.setAttribute('data-proprio', e.textContent);
+    e.textContent = e.getAttribute(osp ? 'data-ospite' : 'data-proprio');
+  });
 
   // emiciclo
   var colori = coloriSeggi(r.seggi), g = $('grafico');
@@ -1168,7 +1189,7 @@ function disegnaRisultato() {
   }).join('');
 
   var extra = contaAffermazioni('completo') - contaAffermazioni('rapido'), bc = $('b-completa');
-  bc.hidden = stato.modo !== 'rapido' || extra <= 0;
+  bc.hidden = osp || stato.modo !== 'rapido' || extra <= 0;
   bc.textContent = 'Aggiungi le altre ' + extra + ' affermazioni';
 
   disegnaTabellaPosizioni();
@@ -1248,17 +1269,18 @@ function collegaEvidenza() {
 
 function segno(v) { return v > 0 ? '+' + v : v < 0 ? '\u2212' + Math.abs(v) : '0'; }
 function disegnaTabellaPosizioni() {
-  var h = '<thead><tr><th scope="col">Affermazione</th><th scope="col" class="tu">Tu</th>' +
+  var conTu = !stato.ospite;
+  var h = '<thead><tr><th scope="col">Affermazione</th>' + (conTu ? '<th scope="col" class="tu">Tu</th>' : '') +
     AREE.map(function (a) { return '<th scope="col" style="--c:' + a.colore + '"><span class="pallino"></span><abbr title="' + esc(a.nome) + '">' + esc(a.cod) + '</abbr></th>'; }).join('') + '</tr></thead><tbody>';
-  $('tabella-posizioni').style.setProperty('--colonne', AREE.length + 1);
+  $('tabella-posizioni').style.setProperty('--colonne', AREE.length + (conTu ? 1 : 0));
   TEMI.forEach(function (t) {
-    h += '<tr class="titolo-tema"><td colspan="' + (AREE.length + 2) + '">' + esc(t.nome) + '</td></tr>';
+    h += '<tr class="titolo-tema"><td colspan="' + (AREE.length + (conTu ? 2 : 1)) + '">' + esc(t.nome) + '</td></tr>';
     t.affermazioni.forEach(function (a, k) {
       if (!nelTest(a)) return;
       var u = stato.risposte[t.id + ':' + k];
       var nStime = a.pos.filter(function (_, f) { return eStima(a, f); }).length;
       var etichetta = nStime === a.pos.length ? '<span class="etichetta-stima">tutta stimata</span>' : nStime >= a.pos.length - 2 ? '<span class="etichetta-stima">in gran parte stimata</span>' : '';
-      h += '<tr><td>' + esc(a.testo) + etichetta + '</td><td class="tu" data-sigla="Tu">' + (u === undefined ? '\u2013' : segno(u)) + '</td>' +
+      h += '<tr><td>' + esc(a.testo) + etichetta + '</td>' + (conTu ? '<td class="tu" data-sigla="Tu">' + (u === undefined ? '\u2013' : segno(u)) + '</td>' : '') +
         a.pos.map(function (p, f) { var s = eStima(a, f); return '<td data-sigla="' + esc(AREE[f].cod) + '"' + (s ? ' class="stima" title="Stima: nessuna fonte specifica"' : '') + '>' + segno(p) + (s ? '*' : '') + '</td>'; }).join('') + '</tr>';
     });
   });
@@ -1273,21 +1295,91 @@ function indirizzo() { return location.origin + location.pathname; }
 function testoRisultato(r) {
   var righe = ['Il mio emiciclo: ' + testoVerdetto(r), ''];
   AREE.forEach(function (a, i) { if (r.seggi[i]) righe.push(a.nome + ' (' + a.sigla + '): ' + r.seggi[i]); });
-  righe.push('', 'Fai il test: ' + indirizzo());
+  righe.push('', 'Guardalo e fai il test anche tu: ' + linkRisultato(r));
   return righe.join('\n');
 }
 function esito(msg) { $('esito-azione').textContent = msg; }
 
-function copiaRisultato() {
-  var t = testoRisultato(ultimoRisultato);
+function copia(t, fatto) {
   function riserva() {
     var ta = el('textarea', { 'class': 'solo-lettori' }); ta.value = t; document.body.appendChild(ta); ta.select();
     var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
     document.body.removeChild(ta);
-    esito(ok ? 'Risultato copiato negli appunti.' : 'Copia non riuscita: il browser ha bloccato l’accesso agli appunti.');
+    esito(ok ? fatto : 'Copia non riuscita: il browser ha bloccato l’accesso agli appunti.');
   }
-  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function () { esito('Risultato copiato negli appunti.'); }, riserva);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function () { esito(fatto); }, riserva);
   else riserva();
+}
+function copiaRisultato() { copia(testoRisultato(ultimoRisultato), 'Risultato copiato negli appunti.'); }
+
+/* ---------- Link al risultato ----------
+   Il link porta solo il risultato: seggi, affinità, gruppo più vicino tema per tema, priorità. Le risposte non ci sono.
+   Il codice sta dopo il cancelletto, quindi resta nel browser e non arriva al server.
+   Formato (versione 1), a gruppi di 6 bit: versione 4 bit, test completo 1, affermazioni segnate 7, una priorità per tema,
+   seggi 9 bit per gruppo, affinità in decimillesimi 14 bit per gruppo, per ogni tema un bit per ciascun gruppo in testa. */
+var VERSIONE_LINK = 1, CIFRE_LINK = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+var BIT_LINK = 12 + TEMI.length + AREE.length * 23 + TEMI.length * AREE.length;
+function codificaRisultato(r) {
+  var bit = [];
+  function scrivi(v, n) { for (var i = n - 1; i >= 0; i--) bit.push((v >> i) & 1); }
+  scrivi(VERSIONE_LINK, 4);
+  scrivi(stato.modo === 'completo' ? 1 : 0, 1);
+  scrivi(r.contate, 7);
+  TEMI.forEach(function (t) { scrivi(stato.priorita.has(t.id) ? 1 : 0, 1); });
+  r.seggi.forEach(function (n) { scrivi(n, 9); });
+  r.affinita.forEach(function (a) {
+    var d = Math.round(a * 10000), p = Math.round(a * 100);
+    if (Math.round(d / 100) !== p) d += Math.round(d / 100) > p ? -1 : 1;      // la percentuale mostrata deve restare la stessa
+    scrivi(d, 14);
+  });
+  TEMI.forEach(function (t) {
+    var v = r.perTema[t.id], m = 0;
+    if (v) { var max = Math.max.apply(null, v); v.forEach(function (x, i) { if (max - x < 1e-9) m |= 1 << i; }); }
+    scrivi(m, AREE.length);
+  });
+  var s = '';
+  for (var i = 0; i < bit.length; i += 6) { var c = 0; for (var k = 0; k < 6; k++) c = c << 1 | (bit[i + k] || 0); s += CIFRE_LINK.charAt(c); }
+  return s;
+}
+function decodificaRisultato(s) {
+  if (s.length !== Math.ceil(BIT_LINK / 6) || /[^A-Za-z0-9_-]/.test(s)) return null;
+  var bit = [], p = 0;
+  for (var i = 0; i < s.length; i++) { var c = CIFRE_LINK.indexOf(s.charAt(i)); for (var k = 5; k >= 0; k--) bit.push((c >> k) & 1); }
+  function leggi(n) { var v = 0; for (var q = 0; q < n; q++) v = v << 1 | bit[p++]; return v; }
+  if (leggi(4) !== VERSIONE_LINK) return null;
+  var o = { modo: leggi(1) ? 'completo' : 'rapido', contate: leggi(7), priorita: new Set(), seggi: [], affinita: [], perTema: {} };
+  TEMI.forEach(function (t) { if (leggi(1)) o.priorita.add(t.id); });
+  AREE.forEach(function () { o.seggi.push(leggi(9)); });
+  AREE.forEach(function () { o.affinita.push(leggi(14) / 10000); });
+  TEMI.forEach(function (t) {
+    var m = leggi(AREE.length);
+    if (m) o.perTema[t.id] = AREE.map(function (_, i) { return (m >> i) & 1; });
+  });
+  var totale = o.seggi.reduce(function (a, b) { return a + b; }, 0);
+  if (totale !== PARAMETRI.seggi || o.priorita.size > PARAMETRI.maxPriorita || o.contate < 1 || o.contate > contaAffermazioni(o.modo) ||
+      o.affinita.some(function (a) { return a > 1; })) return null;
+  return o;
+}
+function linkRisultato(r) { return indirizzo() + '#e=' + codificaRisultato(r); }
+function togliCodice() {
+  if (location.hash && window.history && history.replaceState) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
+}
+// sui telefoni si apre il menu di condivisione del sistema; altrove il link va negli appunti
+var MENU_CONDIVISIONE = !!navigator.share && !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+function condividiLink() {
+  var r = ultimoRisultato, url = linkRisultato(r), fatto = 'Link copiato negli appunti: chi lo apre vede il tuo emiciclo, non le tue risposte.';
+  if (!MENU_CONDIVISIONE) { copia(url, fatto); return; }
+  navigator.share({ title: 'Il mio emiciclo', text: 'Il mio emiciclo: ' + testoVerdetto(r), url: url })
+    .then(function () { esito(''); }, function (e) { if (!e || e.name !== 'AbortError') copia(url, fatto); });
+}
+function apriDaLink() {
+  var m = /^#e=(.*)$/.exec(location.hash);
+  if (!m) return false;
+  var o = decodificaRisultato(m[1]);
+  if (!o) { togliCodice(); $('link-rotto').hidden = false; if (stato.passo !== 0) rifai(true); return false; }
+  stato.risposte = {}; stato.soloNuove = false; stato.modo = o.modo; stato.priorita = o.priorita; stato.ospite = o;
+  mostra(ULTIMO);
+  return true;
 }
 
 function righe(ctx, testo, larghezza) {
@@ -1379,32 +1471,38 @@ function scaricaImmagine() {
   });
 }
 
-function rifai() {
-  stato.risposte = {}; stato.priorita = new Set(); stato.modo = 'rapido'; stato.soloNuove = false; ultimoRisultato = null;
+function rifai(tieniAvviso) {
+  stato.risposte = {}; stato.priorita = new Set(); stato.modo = 'rapido'; stato.soloNuove = false; stato.ospite = null; ultimoRisultato = null;
+  togliCodice();
+  if (tieniAvviso !== true) $('link-rotto').hidden = true;
   mostra(0);
 }
 
 /* ---------- Avvio ---------- */
-disegnaEmicicloVuoto();
 collegaEvidenza();
+if (MENU_CONDIVISIONE) $('b-link').textContent = 'Condividi il link';
 $('n-rapido').textContent = contaAffermazioni('rapido');
 $('n-completo').textContent = contaAffermazioni('completo');
 $('b-completa').addEventListener('click', function () { stato.modo = 'completo'; stato.soloNuove = true; mostra(2); });
 $('b-immagine').addEventListener('click', scaricaImmagine);
+$('b-link').addEventListener('click', condividiLink);
 $('b-copia').addEventListener('click', copiaRisultato);
-$('b-rifai').addEventListener('click', rifai);
+$('b-rifai').addEventListener('click', function () { rifai(); });
 $('marchio').addEventListener('click', function (e) {
   if (stato.passo === 0) return;
   e.preventDefault();
   if (Object.keys(stato.risposte).length === 0 || window.confirm('Tornare all’inizio? Le risposte segnate andranno perse.')) rifai();
 });
 document.addEventListener('click', function (e) {
+  if (e.target.closest('[data-fai]')) { rifai(); return; }
   var m = e.target.closest('[data-modo]');
   if (m) { stato.modo = m.getAttribute('data-modo'); stato.soloNuove = false; mostra(1); return; }
   var b = e.target.closest('[data-vai]');
   if (!b) return;
   if (b.getAttribute('data-vai') === 'avanti') avanti(); else indietro();
 });
+window.addEventListener('hashchange', apriDaLink);
+if (!apriDaLink()) disegnaEmicicloVuoto();
 })();
 </script>
 </body>
